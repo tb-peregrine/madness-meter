@@ -1,0 +1,19 @@
+
+DESCRIPTION >
+    Stores live basketball game events with scores, team information, and ratings
+
+SCHEMA >
+    `timestamp` DateTime `json:$.timestamp`,
+    `game_id` String `json:$.game_id`,
+    `team1_name` String `json:$.team1_name`,
+    `team2_name` String `json:$.team2_name`,
+    `team1_seed` UInt8 `json:$.team1_seed`,
+    `team2_seed` UInt8 `json:$.team2_seed`,
+    `team1_kenpom` Float32 `json:$.team1_kenpom`,
+    `team2_kenpom` Float32 `json:$.team2_kenpom`,
+    `team1_score` UInt16 `json:$.team1_score`,
+    `team2_score` UInt16 `json:$.team2_score`
+
+ENGINE "MergeTree"
+ENGINE_PARTITION_KEY "toYYYYMMDD(timestamp)"
+ENGINE_SORTING_KEY "game_id, timestamp"

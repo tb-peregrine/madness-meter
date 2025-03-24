@@ -1,0 +1,62 @@
+DESCRIPTION >
+    Calculates the current madness level across all active games based on seed upsets and score differences
+
+NODE calculate_madness
+SQL >
+    SELECT 
+        round(avg(game_madness_score), 2) as overall_madness,
+        count() as total_games,
+        groupArray(concat(
+            game_id, ': ',
+            team1_name, ' vs ', team2_name, ' (',
+            toString(team1_score), '-', toString(team2_score), ') [',
+            toString(team1_seed), '-', toString(team2_seed), '] = ',
+            toString(round(game_madness_score, 2))
+        )) as game_details
+    FROM (
+        SELECT
+            game_id,
+            team1_name,
+            team2_name,
+            team1_seed,
+            team2_seed,
+            team1_score,
+            team2_score,
+            CASE
+                -- Higher seed winning by more than 20 points = 0 madness
+                WHEN team1_seed < team2_seed AND team1_score - team2_score > 20 THEN 0
+                WHEN team2_seed < team1_seed AND team2_score - team1_score > 20 THEN 0
+                -- Even seeds tied = 50 madness
+                WHEN team1_seed = team2_seed AND team1_score = team2_score THEN 50
+                -- Lower seed beating higher seed
+                WHEN team1_seed > team2_seed AND team1_score > team2_score THEN
+                    least(100, 50 + (team1_seed - team2_seed) * 5 + least(50, (team1_score - team2_score) * 2.5))
+                WHEN team2_seed > team1_seed AND team2_score > team1_score THEN
+                    least(100, 50 + (team2_seed - team1_seed) * 5 + least(50, (team2_score - team1_score) * 2.5))
+                -- Higher seed winning by less than 20 points
+                WHEN team1_seed < team2_seed THEN
+                    least(100, 50 - (team1_score - team2_score) * 2.5)
+                WHEN team2_seed < team1_seed THEN
+                    least(100, 50 - (team2_score - team1_score) * 2.5)
+                ELSE 0
+            END as game_madness_score
+        FROM (
+            SELECT
+                game_id,
+                team1_name,
+                team2_name,
+                team1_seed,
+                team2_seed,
+                team1_score,
+                team2_score,
+                timestamp
+            FROM (
+                SELECT *,
+                    ROW_NUMBER() OVER (PARTITION BY game_id ORDER BY timestamp DESC) as rn
+                FROM basketball_game_events
+            ) 
+            WHERE rn = 1
+        )
+    )
+
+TYPE endpoint

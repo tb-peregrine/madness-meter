@@ -1,0 +1,38 @@
+DESCRIPTION >
+    Tracks the madness level over time by minute for the entire tournament duration
+
+NODE calculate_madness_by_minute
+SQL >
+    SELECT 
+        toStartOfMinute(timestamp) as minute,
+        round(avg(game_madness_score), 2) as madness_level,
+        count() as active_games
+    FROM (
+        SELECT
+            timestamp,
+            game_id,
+            CASE
+                -- Higher seed winning by more than 20 points = 0 madness
+                WHEN team1_seed < team2_seed AND team1_score - team2_score > 20 THEN 0
+                WHEN team2_seed < team1_seed AND team2_score - team1_score > 20 THEN 0
+                -- Even seeds tied = 50 madness
+                WHEN team1_seed = team2_seed AND team1_score = team2_score THEN 50
+                -- Lower seed beating higher seed
+                WHEN team1_seed > team2_seed AND team1_score > team2_score THEN
+                    least(100, 50 + (team1_seed - team2_seed) * 5 + least(50, (team1_score - team2_score) * 2.5))
+                WHEN team2_seed > team1_seed AND team2_score > team1_score THEN
+                    least(100, 50 + (team2_seed - team1_seed) * 5 + least(50, (team2_score - team1_score) * 2.5))
+                -- Higher seed winning by less than 20 points
+                WHEN team1_seed < team2_seed THEN
+                    least(100, 50 - (team1_score - team2_score) * 2.5)
+                WHEN team2_seed < team1_seed THEN
+                    least(100, 50 - (team2_score - team1_score) * 2.5)
+                ELSE 0
+            END as game_madness_score
+        FROM basketball_game_events
+        WHERE timestamp >= '2024-03-19 11:00:00'
+    )
+    GROUP BY minute
+    ORDER BY minute ASC
+
+TYPE endpoint
